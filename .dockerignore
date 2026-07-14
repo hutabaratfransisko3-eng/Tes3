@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.git
+.cache
+.local
+.agents
+*.log
+discord-bot.zip
+discord-bot-railway.zip
+attached_assets

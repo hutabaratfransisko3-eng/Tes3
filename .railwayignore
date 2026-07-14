@@ -1,0 +1,8 @@
+node_modules
+.git
+.cache
+.local
+.agents
+*.log
+discord-bot.zip
+json.sqlite
