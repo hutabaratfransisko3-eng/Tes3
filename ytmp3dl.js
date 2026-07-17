@@ -1,60 +1,97 @@
-import axios from 'axios'
+/*
+ * [ Yt Mp3 ]
+ * creator : H1Dz
+ * base    : -
+ * channel : https://whatsapp.com/channel/0029Vb82nkLEwEjtLSQ49I44
+ * support : follow my channel for more updates
+ */
 
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Origin': 'https://id.ytmp3.mobi',
-  'Referer': 'https://id.ytmp3.mobi/',
-  'Accept': '*/*'
-}
+if (command === 'ytmp3v2') {
+    if (!args[0]) {
+        return message.reply(`┌˚₊ ๑│ s ʏ s ᴛ ᴇ ᴍ   ᴇ ʀ ʀ ᴏ ʀ │๑˚₊ ❌\n┇ Masukkan URL YouTube!\n│ *Contoh:* ${PREFIX}${command} https://youtu.be/dQw4w9WgXcQ\n└˚₊ ๑ ────────────── ๑˚₊\n> © ERINE-AI`);
+    }
 
-function extractVideoId(url) {
-  const match = url.match(/(?:v=|\/v\/|embed\/|youtu\.be\/|\/shorts\/|^)([^#&?^\/]{11})/)
-  return match ? match[1] : null
-}
+    const url = args[0];
+    const apikey = 'cuki-x';
+    const quality = '128'; 
+    const apiUrl = `https://api.cuki.biz.id/api/downloader/ytmp3?apikey=${apikey}&url=${encodeURIComponent(url)}&quality=${quality}`;
 
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms))
-}
+    try {
+        await message.react('⏳');
+    } catch (err) {
+        console.log('Gagal memberikan reaksi emoji.');
+    }
 
-export async function ytmp3dl(url) {
-  if (
-    !/^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?.*?[&?]v=|youtu\.be\/)[\w-]{11}(\S*)?$/i.test(url)
-  ) {
-    throw new Error('Invalid YouTube URL.')
-  }
+    try {
+        const { data } = await axios.get(apiUrl);
+        
+        console.log('=== RESPONSE API CUKI ===');
+        console.log(JSON.stringify(data, null, 2));
+        console.log('=========================');
 
-  const videoId = extractVideoId(url)
-  if (!videoId) throw new Error('Gagal mengekstrak video ID dari URL.')
+        if (data.status !== true && data.success !== true) {
+            throw new Error(data.message || 'API merespon dengan kegagalan.');
+        }
 
-  // Step 1: Init
-  const { data: init } = await axios.get(
-    `https://a.ymcdn.org/api/v1/init?23=1llum1n471&p=y&_=${Math.random()}`,
-    { headers: HEADERS }
-  )
-  if (init.error !== 0) throw new Error('Gagal inisialisasi konverter ytmp3.')
+        const result = data.data || data;
+        const meta = result.metadata || result.meta;
+        const audio = result.audio || result;
 
-  await sleep(1500)
+        if (!meta || !audio) {
+            throw new Error('Struktur respons API berubah atau tidak sesuai. Cek terminal bot!');
+        }
 
-  // Step 2: Convert
-  const { data: convert } = await axios.get(
-    `${init.convertURL}&v=${videoId}&f=mp3&_=${Math.random()}`,
-    { headers: HEADERS }
-  )
-  if (convert.error !== 0) throw new Error('Gagal mengkonversi video YouTube.')
+        const d = meta.duration || 0;
+        const minutes = Math.floor(d / 60);
+        const seconds = d % 60;
+        const formatDuration = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
-  const { title, downloadURL } = convert
-  if (!downloadURL) throw new Error('Download link tidak ditemukan.')
+        const embed = new EmbedBuilder()
+            .setColor('#FF0000')
+            .setTitle('🎵 ʏ ᴛ ᴍ ᴘ 3  ᴅ ᴏ ᴡ ɴ ʟ ᴏ ᴀ ᴅ ᴇ ʀ')
+            .addFields(
+                { name: '📌 Judul', value: meta.title || 'Tidak diketahui', inline: false },
+                { name: '⏱️ Durasi', value: formatDuration, inline: true },
+                { name: '🎧 Kualitas', value: audio.label || `${quality}kbps`, inline: true }
+            )
+            .setFooter({ text: '© ERINE-AI' })
+            .setTimestamp();
 
-  // Step 3: Download ke buffer
-  const { data } = await axios.get(downloadURL, {
-    headers: HEADERS,
-    responseType: 'arraybuffer',
-    maxContentLength: Infinity,
-    timeout: 120000
-  })
+        if (meta.thumbnail) {
+            embed.setThumbnail(meta.thumbnail);
+        }
 
-  return {
-    title: title || 'Unknown',
-    buffer: Buffer.from(data)
-  }
+        const downloadUrl = audio.download?.downloadUrl || audio.downloadUrl || audio.link || audio.url;
+
+        if (!downloadUrl) {
+            throw new Error('Link unduhan audio tidak ditemukan dalam respons API.');
+        }
+
+        const audioAttachment = new AttachmentBuilder(downloadUrl, { 
+            name: `${meta.title || 'audio'}.mp3` 
+        });
+
+        await message.reply({
+            embeds: [embed],
+            files: [audioAttachment]
+        });
+
+        await message.reactions.removeAll().catch(() => null);
+        await message.react('✅').catch(() => null);
+
+    } catch (e) {
+        console.error(e);
+        const errorDetail = e.response?.data?.message || e.message;
+
+        const errorEmbed = new EmbedBuilder()
+            .setColor('#FF0000')
+            .setTitle('❌ s ʏ s ᴛ ᴇ ᴍ   ᴇ ʀ ʀ ᴏ ʀ')
+            .setDescription(`Gagal mengunduh audio.\n\n**Detail:** ${errorDetail}`)
+            .setFooter({ text: '© ERINE-AI' });
+
+        await message.reply({ embeds: [errorEmbed] });
+        
+        await message.reactions.removeAll().catch(() => null);
+        await message.react('❌').catch(() => null);
+    }
 }
